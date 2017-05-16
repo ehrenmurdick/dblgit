@@ -2,16 +2,26 @@ package main
 
 import "bytes"
 import "fmt"
-import "io/ioutil"
+
+// import "io/ioutil"
 
 // import "gopkg.in/yaml.v2"
 import "log"
 import "os"
 import "os/exec"
 import "strings"
+import "errors"
+
+type cmd interface {
+	Run() error
+}
+
+var command func(string, ...string) cmd = func(name string, args ...string) cmd {
+	return exec.Command(name, args...)
+}
 
 func readGitConfig(key string) string {
-	cmd := exec.Command("git", "config", "--global", key)
+	cmd := command("git", "config", "--global", key)
 
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -40,29 +50,32 @@ func getCurrentPairs() (string, string) {
 	return author, committer
 }
 
-func getPairsFileBytes() []byte {
-	ioutil.ReadFile(getPairsFilePath())
+// func getPairsFileBytes() []byte {
+// 	ioutil.ReadFile(getPairsFilePath())
+//
+// 	return nil
+// }
 
-	return nil
-}
+var getenv func(string) string = os.Getenv
+var stat func(string) (os.FileInfo, error) = os.Stat
 
-func getPairsFilePath() string {
-	var home = os.Getenv("HOME")
-	if _, err := os.Stat("./.pairs"); err == nil {
-		return ".pairs"
-	} else if _, err := os.Stat(home + "/.pairs"); err == nil {
-		return home + "/.pairs"
+func getPairsFilePath() (string, error) {
+	var home = getenv("HOME")
+	if _, err := stat(".pairs"); err == nil {
+		return ".pairs", nil
+	} else if _, err := stat(home + "/.pairs"); err == nil {
+		return home + "/.pairs", nil
 	}
 
-	log.Fatal("No .pairs file found! Put one in your home directory or current working directory!")
-
-	return ""
+	return "", errors.New("No .pairs file found! Put one in your home directory or current working directory!")
 }
 
 func main() {
-	path := getPairsFilePath()
+	path, _ := getPairsFilePath()
 	fmt.Println(path)
 	author, committer := getCurrentPairs()
 	fmt.Println(author)
 	fmt.Println(committer)
+
+	fmt.Println(nameForInitials(author))
 }
